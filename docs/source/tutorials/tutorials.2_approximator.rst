@@ -39,7 +39,7 @@ actions, creating a ``QRegressor``:
 .. literalinclude:: code/approximator.py
    :lines: 30-32
 
-If you prefer to use an ``ActionRegressor``, simply set the number of actions to (1,):
+If you prefer to use an ``ActionRegressor``, simply set the output shape to (1,):
 
 ::
 
