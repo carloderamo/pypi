@@ -25,7 +25,6 @@ class Walker2D(MuJoCo):
         reset_noise_scale=5e-3,
         exclude_current_positions_from_observation=True,
         n_substeps=4,
-        normalize_reward=False,
         **viewer_params,
     ):
         """
@@ -66,6 +65,7 @@ class Walker2D(MuJoCo):
 
         additional_data_spec = [
             ("x_pos", "rootx", ObservationType.JOINT_POS),
+            ("torso_vel", "torso", ObservationType.BODY_VEL_WORLD),
         ]
 
         self._forward_reward_weight = forward_reward_weight
@@ -99,55 +99,12 @@ class Walker2D(MuJoCo):
 
     def _create_observation(self, obs):
         obs = super()._create_observation(obs)
+        # Clip qvels
         obs[9:] = np.clip(obs[9:], -10, 10)
         if not self._exclude_current_positions_from_observation:
             x_pos = self._read_data("x_pos")
             obs = np.concatenate([obs, x_pos])
         return obs
-
-    def is_absorbing(self, obs):
-        """Return True if the agent is unhealthy and terminate_when_unhealthy is True."""
-        return self._terminate_when_unhealthy and not self._is_healthy(obs)
-
-    def _is_healthy(self, obs):
-        """Check if the agent is healthy."""
-        is_finite = self._is_finite(obs)
-        is_within_z_range = self._is_within_z_range(obs)
-        is_within_angle_range = self._is_within_angle_range(obs)
-        return is_finite and is_within_z_range and is_within_angle_range
-
-    def _get_x_vel(self):
-        x_pos = self._x_pos
-        next_x_pos = self._next_x_pos
-        return (next_x_pos - x_pos) / self.dt
-
-    def _get_forward_reward(self):
-        forward_reward = self._get_x_vel()
-        return self._forward_reward_weight * forward_reward
-
-    def _get_healthy_reward(self, obs):
-        """Return the healthy reward if the agent is healthy, else 0."""
-        return (
-            self._healthy_reward
-            if self._is_healthy(obs) or self._terminate_when_unhealthy
-            else 0
-        )
-
-    def _get_ctrl_cost(self, action):
-        """Return the control cost."""
-        ctrl_cost = np.sum(np.square(action))
-        return self._ctrl_cost_weight * ctrl_cost
-
-    def reward(self, obs, action, next_obs, absorbing):
-        healthy_reward = self._get_healthy_reward(next_obs)
-        forward_reward = self._get_forward_reward()
-        ctrl_cost = self._get_ctrl_cost(action)
-        reward = healthy_reward + forward_reward - ctrl_cost
-        return reward
-
-    def _is_finite(self, obs):
-        """Check if the observation is finite."""
-        return np.isfinite(obs).all()
 
     def _is_within_z_range(self, obs):
         """Check if Z position of torso is within the healthy range."""
@@ -161,41 +118,55 @@ class Walker2D(MuJoCo):
         min_angle, max_angle = self._healthy_angle_range
         return min_angle < y_angle < max_angle
 
-    def _get_error(self):
-        x_vel = self._get_x_vel()
-        return np.abs(self.target_vel - x_vel)
+    def is_absorbing(self, obs):
+        return self._terminate_when_unhealthy and not self._is_healthy(obs)
+
+    def _is_healthy(self, obs):
+        is_within_z_range = self._is_within_z_range(obs)
+        is_within_angle_range = self._is_within_angle_range(obs)
+        return is_within_z_range and is_within_angle_range
+
+    def _get_healthy_reward(self, obs):
+        """Return the healthy reward if the agent is healthy, else 0."""
+        return (
+            self._is_healthy(obs) or self._terminate_when_unhealthy
+        ) * self._healthy_reward
+
+    def _get_forward_reward(self):
+        forward_reward = self._read_data("torso_vel")[3]
+        return self._forward_reward_weight * forward_reward
+
+    def _get_ctrl_cost(self, action):
+        """Return the control cost."""
+        ctrl_cost = np.sum(np.square(action))
+        return self._ctrl_cost_weight * ctrl_cost
+
+    def reward(self, obs, action, next_obs, absorbing):
+        healthy_reward = self._get_healthy_reward(next_obs)
+        forward_reward = self._get_forward_reward()
+        ctrl_cost = self._get_ctrl_cost(action)
+        reward = healthy_reward + forward_reward - ctrl_cost
+        return reward
+
+    def _generate_noise(self):
+        self._data.qpos[:] = self._data.qpos + np.random.uniform(
+            -self._reset_noise_scale, self._reset_noise_scale, self._model.nq
+        )
+        self._data.qvel[:] = self._data.qvel + np.random.uniform(
+            -self._reset_noise_scale, self._reset_noise_scale, self._model.nv
+        )
 
     def setup(self, obs):
         super().setup(obs)
 
-        self._data.qpos[:] = (
-            self._data.qpos
-            + np.random.uniform(
-                -self._reset_noise_scale, self._reset_noise_scale, self._model.nq
-            )
-        ).copy()
-        self._data.qvel[:] = (
-            self._data.qvel
-            + np.random.uniform(
-                -self._reset_noise_scale, self._reset_noise_scale, self._model.nv
-            )
-        ).copy()
+        self._generate_noise()
 
         mujoco.mj_forward(self._model, self._data)  # type: ignore
 
-    def _create_info_dictionary(self, obs):
+    def _create_info_dictionary(self, obs, action):
         info = {
             "healthy_reward": self._get_healthy_reward(obs),
             "forward_reward": self._get_forward_reward(),
         }
-        # if action is not None:
-        #     info["ctrl_cost"] = self._get_ctrl_cost(action, ctrl_cost_weight=1)
+        info["ctrl_cost"] = self._get_ctrl_cost(action)
         return info
-
-    def _step_init(self, obs, action):
-        super()._step_init(obs, action)
-        self._x_pos = self._read_data("x_pos").item()
-
-    def _step_finalize(self):
-        super()._step_finalize()
-        self._next_x_pos = self._read_data("x_pos").item()

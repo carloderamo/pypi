@@ -55,6 +55,7 @@ class HalfCheetah(MuJoCo):
 
         additional_data_spec = [
             ("x_pos", "rootx", ObservationType.JOINT_POS),
+            ("torso_vel", "torso", ObservationType.BODY_VEL_WORLD),
         ]
 
         self._forward_reward_weight = forward_reward_weight
@@ -92,11 +93,8 @@ class HalfCheetah(MuJoCo):
     def is_absorbing(self, obs):
         return False
 
-    def _get_x_vel(self):
-        return (self._next_x_pos - self._x_pos) / self.dt
-
     def _get_forward_reward(self):
-        forward_reward = self._get_x_vel()
+        forward_reward = self._read_data("torso_vel")[3]
         return self._forward_reward_weight * forward_reward
 
     def _get_ctrl_cost(self, action):
@@ -109,34 +107,24 @@ class HalfCheetah(MuJoCo):
         reward = forward_reward - ctrl_cost
         return reward
 
+    def _generate_noise(self):
+        self._data.qpos[:] = self._data.qpos + np.random.uniform(
+            -self._reset_noise_scale, self._reset_noise_scale, self._model.nq
+        )
+        self._data.qvel[:] = self._data.qvel + np.random.uniform(
+            -self._reset_noise_scale, self._reset_noise_scale, self._model.nv
+        )
+
     def setup(self, obs):
         super().setup(obs)
-        self._data.qpos[:] = (
-            self._data.qpos
-            + np.random.uniform(
-                -self._reset_noise_scale, self._reset_noise_scale, self._model.nq
-            )
-        ).copy()
-        self._data.qvel[:] = (
-            self._data.qvel
-            + self._reset_noise_scale * np.random.standard_normal(self._model.nv).copy()
-        ).copy()
+
+        self._generate_noise()
 
         mujoco.mj_forward(self._model, self._data)  # type: ignore
 
-    def _create_info_dictionary(self, obs):
+    def _create_info_dictionary(self, obs, action):
         info = {
-            "x_vel": self._get_x_vel(),
             "forward_reward": self._get_forward_reward(),
         }
-        # if action is not None:
-        #     info["ctrl_cost"] = self._get_ctrl_cost(action, ctrl_cost_weight=1)
+        info["ctrl_cost"] = self._get_ctrl_cost(action)
         return info
-
-    def _step_init(self, obs, action):
-        super()._step_init(obs, action)
-        self._x_pos = self._read_data("x_pos").item()
-
-    def _step_finalize(self):
-        super()._step_finalize()
-        self._next_x_pos = self._read_data("x_pos").item()

@@ -53,6 +53,7 @@ class Hopper(MuJoCo):
 
         additional_data_spec = [
             ("x_pos", "rootx", ObservationType.JOINT_POS),
+            ("torso_vel", "torso", ObservationType.BODY_VEL_WORLD),
         ]
 
         self._forward_reward_weight = forward_reward_weight
@@ -87,58 +88,18 @@ class Hopper(MuJoCo):
 
     def _create_observation(self, obs):
         obs = super()._create_observation(obs)
+        # Clip the qvels
         obs[5:] = np.clip(obs[5:], -10, 10)
         if not self._exclude_current_positions_from_observation:
             x_pos = self._read_data("x_pos")
             obs = np.concatenate([obs, x_pos])
         return obs
 
-    def is_absorbing(self, obs):
-        """Return True if the agent is unhealthy and terminate_when_unhealthy is True."""
-        return self._terminate_when_unhealthy and not self._is_healthy(obs)
-
-    def _get_x_vel(self):
-        x_pos = self._x_pos
-        next_x_pos = self._next_x_pos
-        return (next_x_pos - x_pos) / self.dt
-
-    def _get_forward_reward(self):
-        forward_reward = self._get_x_vel()
-        return self._forward_reward_weight * forward_reward
-
-    def _get_healthy_reward(self, obs):
-        """Return the healthy reward if the agent is healthy, else 0."""
-        return (
-            self._healthy_reward
-            if self._is_healthy(obs) or self._terminate_when_unhealthy
-            else 0
-        )
-
-    def _get_ctrl_cost(self, action):
-        """Return the control cost."""
-        ctrl_cost = np.sum(np.square(action))
-        return self._ctrl_cost_weight * ctrl_cost
-
-    def reward(self, obs, action, next_obs, absorbing):
-        healthy_reward = self._get_healthy_reward(next_obs)
-        forward_reward = self._get_forward_reward()
-        ctrl_cost = self._get_ctrl_cost(action)
-        reward = healthy_reward + forward_reward - ctrl_cost
-        return reward
-
-    def _is_healthy(self, obs: np.ndarray) -> bool:
-        """Check if the agent is healthy."""
-        is_within_state_range = self._is_within_state_range(obs)
-        is_within_z_range = self._is_within_z_range(obs)
-        is_within_angle_range = self._is_within_angle_range(obs)
-        return is_within_state_range and is_within_z_range and is_within_angle_range
-
-    def _is_within_state_range(self, obs: np.ndarray) -> bool:
+    def _is_within_state_range(self) -> bool:
         """Check if state variables are within the healthy range."""
-        idx = 1 if self._exclude_current_positions_from_observation else 2
-        state_values = obs[idx:]
+        state = self.get_states()
         min_state, max_state = self._healthy_state_range
-        return all(min_state < value.item() < max_state for value in state_values)
+        return np.all(np.logical_and(min_state < state, state < max_state))
 
     def _is_within_z_range(self, obs: np.ndarray) -> bool:
         """Check if Z position of torso is within the healthy range."""
@@ -152,43 +113,62 @@ class Hopper(MuJoCo):
         min_angle, max_angle = self._healthy_angle_range
         return min_angle < y_angle < max_angle
 
-    def _get_error(
-        self,
-    ):
-        x_vel = self._get_x_vel()
-        return np.abs(x_vel - self.target_vel)
+    def _is_healthy(self, obs: np.ndarray) -> bool:
+        """Check if the agent is healthy."""
+        is_within_state_range = self._is_within_state_range()
+        is_within_z_range = self._is_within_z_range(obs)
+        is_within_angle_range = self._is_within_angle_range(obs)
+        return is_within_state_range and is_within_z_range and is_within_angle_range
+
+    def is_absorbing(self, obs):
+        """Return True if the agent is unhealthy and terminate_when_unhealthy is True."""
+        return self._terminate_when_unhealthy and not self._is_healthy(obs)
+
+    def _get_healthy_reward(self, obs):
+        """Return the healthy reward if the agent is healthy, else 0."""
+        return (
+            self._is_healthy(obs) or self._terminate_when_unhealthy
+        ) * self._healthy_reward
+
+    def _get_forward_reward(self):
+        forward_reward = self._read_data("torso_vel")[3]
+        return self._forward_reward_weight * forward_reward
+
+    def _get_ctrl_cost(self, action):
+        """Return the control cost."""
+        ctrl_cost = np.sum(np.square(action))
+        return self._ctrl_cost_weight * ctrl_cost
+
+    def reward(self, obs, action, next_obs, absorbing):
+        healthy_reward = self._get_healthy_reward(next_obs)
+        forward_reward = self._get_forward_reward()
+        ctrl_cost = self._get_ctrl_cost(action)
+        reward = healthy_reward + forward_reward - ctrl_cost
+        return reward
+
+    def _generate_noise(self):
+        self._data.qpos[:] = self._data.qpos + np.random.uniform(
+            -self._reset_noise_scale, self._reset_noise_scale, self._model.nq
+        )
+        self._data.qvel[:] = self._data.qvel + np.random.uniform(
+            -self._reset_noise_scale, self._reset_noise_scale, self._model.nv
+        )
 
     def setup(self, obs):
         super().setup(obs)
 
-        self._data.qpos[:] = (
-            self._data.qpos
-            + np.random.uniform(
-                -self._reset_noise_scale, self._reset_noise_scale, self._model.nq
-            )
-        ).copy()
-        self._data.qvel[:] = (
-            self._data.qvel
-            + np.random.uniform(
-                -self._reset_noise_scale, self._reset_noise_scale, self._model.nv
-            )
-        ).copy()
+        self._generate_noise()
 
         mujoco.mj_forward(self._model, self._data)  # type: ignore
 
-    def _create_info_dictionary(self, obs):
+    def _create_info_dictionary(self, obs, action):
         info = {
             "healthy_reward": self._get_healthy_reward(obs),
             "forward_reward": self._get_forward_reward(),
         }
-        # if action is not None:
-        #     info["ctrl_cost"] = self._get_ctrl_cost(action, ctrl_cost_weight=1)
+        info["ctrl_cost"] = self._get_ctrl_cost(action)
         return info
 
-    def _step_init(self, obs, action):
-        super()._step_init(obs, action)
-        self._x_pos = self._read_data("x_pos").item()
-
-    def _step_finalize(self):
-        super()._step_finalize()
-        self._next_x_pos = self._read_data("x_pos").item()
+    def get_states(self):
+        """Return the position and velocity joint states of the model"""
+        return np.concatenate([self._data.qpos.flat, self._data.qvel.flat])

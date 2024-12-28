@@ -1,5 +1,5 @@
 from pathlib import Path
-
+from typing import Tuple
 
 import numpy as np
 from mushroom_rl.environments.mujoco import MuJoCo, ObservationType
@@ -11,23 +11,24 @@ class Ant(MuJoCo):
     """
     The Ant MuJoCo environment as presented in:
     "High-Dimensional Continuous Control Using Generalized Advantage Estimation". John Schulman et. al.. 2015.
+    and implemented in Gymnasium
     """
 
     def __init__(
         self,
-        gamma=0.99,
-        horizon=1000,
-        forward_reward_weight=1.0,
-        ctrl_cost_weight=0.5,
-        contact_cost_weight=5e-4,
-        healthy_reward=1.0,
-        terminate_when_unhealthy=True,
-        healthy_z_range=(0.2, 1.0),
-        contact_force_range=(-1.0, 1.0),
-        reset_noise_scale=0.1,
-        n_substeps=5,
-        exclude_current_positions_from_observation=True,
-        use_contact_forces=False,
+        gamma: float = 0.99,
+        horizon: int = 1000,
+        forward_reward_weight: float = 1.0,
+        ctrl_cost_weight: float = 0.5,
+        contact_cost_weight: float = 5e-4,
+        healthy_reward: float = 1.0,
+        terminate_when_unhealthy: bool = True,
+        healthy_z_range: Tuple[float, float] = (0.2, 1.0),
+        contact_force_range: Tuple[float, float] = (-1.0, 1.0),
+        reset_noise_scale: float = 0.1,
+        n_substeps: int = 5,
+        exclude_current_positions_from_observation: bool = True,
+        use_contact_forces: bool = False,
         **viewer_params,
     ):
         """
@@ -72,10 +73,8 @@ class Ant(MuJoCo):
         ]
 
         additional_data_spec = [
-            # Include torso vel for reward calculation
             ("torso_pos", "torso", ObservationType.BODY_POS),
             ("torso_vel", "torso", ObservationType.BODY_VEL_WORLD),
-            ("root_pose", "root", ObservationType.JOINT_POS),
         ]
 
         collision_groups = [
@@ -129,28 +128,26 @@ class Ant(MuJoCo):
         states = self.get_states()
         return np.isfinite(states).all()
 
-    def _is_within_z_range(self, z_pos):
-        z_pos = self._read_data("root_pose")[2]
+    def _is_within_z_range(self):
+        z_pos = self._read_data("torso_pos")[2]
         min_z, max_z = self._healthy_z_range
         return min_z <= z_pos <= max_z
 
-    def _is_healthy(self, obs):
-        is_healthy = self._is_finite() and self._is_within_z_range(obs)
+    def _is_healthy(self):
+        is_healthy = self._is_finite() and self._is_within_z_range()
         return is_healthy
 
     def is_absorbing(self, obs):
-        absorbing = self._terminate_when_unhealthy and not self._is_healthy(obs)
+        absorbing = self._terminate_when_unhealthy and not self._is_healthy()
         return absorbing
 
     def _get_healthy_reward(self, obs):
         return (
-            self._healthy_reward
-            if self._is_healthy(obs) or self._terminate_when_unhealthy
-            else 0.0
-        )
+            self._terminate_when_unhealthy and self._is_healthy()
+        ) * self._healthy_reward
 
     def _get_forward_reward(self):
-        forward_reward = self._read_data("torso_vel")[0]
+        forward_reward = self._read_data("torso_vel")[3]
         return self._forward_reward_weight * forward_reward
 
     def _get_ctrl_cost(self, action):
@@ -167,11 +164,11 @@ class Ant(MuJoCo):
     def reward(self, obs, action, next_obs, absorbing):
         healthy_reward = self._get_healthy_reward(next_obs)
         forward_reward = self._get_forward_reward()
-        ctrl_cost = self._get_ctrl_cost(action)
-        contact_cost = (
-            self._get_contact_cost(next_obs) if self._use_contact_forces else 0.0
-        )
-        reward = healthy_reward + forward_reward - ctrl_cost - contact_cost
+        cost = self._get_ctrl_cost(action)
+        if self._use_contact_forces:
+            contact_cost = self._get_contact_cost(next_obs)
+            cost += contact_cost
+        reward = healthy_reward + forward_reward - cost
         return reward
 
     def _generate_noise(self):
@@ -191,12 +188,12 @@ class Ant(MuJoCo):
 
         mujoco.mj_forward(self._model, self._data)  # type: ignore
 
-    def _create_info_dictionary(self, obs):
+    def _create_info_dictionary(self, obs, action):
         info = {
             "healthy_reward": self._get_healthy_reward(obs),
             "forward_reward": self._get_forward_reward(),
         }
-        # info["ctrl_cost"] = self._get_ctrl_cost(action, ctrl_cost_weight=1)
+        info["ctrl_cost"] = self._get_ctrl_cost(action)
         if self._use_contact_forces:
             info["contact_cost"] = self._get_contact_cost(obs)
         return info
