@@ -125,7 +125,7 @@ def experiment(alg, n_epochs, n_steps, n_episodes_test):
     core = Core(agent, mdp)
 
     # RUN
-    dataset = core.evaluate(n_episodes=n_episodes_test, render=False)
+    dataset = core.evaluate(n_episodes=n_episodes_test, render=True)
 
     J = np.mean(dataset.discounted_return)
     R = np.mean(dataset.undiscounted_return)
