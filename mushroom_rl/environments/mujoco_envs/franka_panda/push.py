@@ -5,20 +5,18 @@ import mujoco
 
 from mushroom_rl.environments.mujoco import ObservationType
 from mushroom_rl.rl_utils.spaces import Box
-from mushroom_rl.environments.mujoco_envs.panda import Panda
+from mushroom_rl.environments.mujoco_envs.franka_panda.panda import Panda
 
 
 class Push(Panda):
-
     def __init__(
         self,
         gamma: float = 0.99,
         horizon: int = 200,
-        gripper_cube_distance_reward_weight: float = 0.25,
+        gripper_cube_distance_reward_weight: float = 0.5,
         cube_goal_distance_reward_weight: float = 1.0,
-        ctrl_cost_weight: float = 1e-4,
-        contact_cost_weight: float = 3e-5,
-        normalize_reward: bool = False,
+        ctrl_cost_weight: float = 0.01,
+        contact_cost_weight: float = 0,
         n_substeps: int = 10,
         goal_noise_scale: float = 0.2,
         contact_force_range: tuple[float, float] = (-25.0, 25.0),
@@ -26,7 +24,11 @@ class Push(Panda):
     ):
 
         xml_path = (
-            Path(__file__).resolve().parent / "data" / "panda" / "push" / "push.xml"
+            Path(__file__).resolve().parent.parent
+            / "data"
+            / "panda"
+            / "push"
+            / "push.xml"
         ).as_posix()
 
         actuation_spec = [
@@ -93,21 +95,23 @@ class Push(Panda):
         collision_force = np.array(
             [
                 np.sum(
-                    self._get_collision_force("hand", "floor")
-                    + self._get_collision_force("left_finger", "floor")
-                    + self._get_collision_force("right_finger", "floor")
-                    + self._get_collision_force("robot", "floor")
-                    + self._get_collision_force("hand", "robot")
-                    + self._get_collision_force("left_finger", "robot")
-                    + self._get_collision_force("right_finger", "robot")
-                    + self._get_collision_force("hand", "right_finger")
-                    + self._get_collision_force("hand", "left_finger")
-                    + self._get_collision_force("hand", "cube")
-                    + self._get_collision_force("robot", "cube")
-                    + self._get_collision_force("hand", "table")
-                    + self._get_collision_force("robot", "table")
-                    + self._get_collision_force("left_finger", "table")
-                    + self._get_collision_force("right_finger", "table")
+                    np.square(
+                        self._get_collision_force("hand", "floor")
+                        + self._get_collision_force("left_finger", "floor")
+                        + self._get_collision_force("right_finger", "floor")
+                        + self._get_collision_force("robot", "floor")
+                        + self._get_collision_force("hand", "robot")
+                        + self._get_collision_force("left_finger", "robot")
+                        + self._get_collision_force("right_finger", "robot")
+                        + self._get_collision_force("hand", "right_finger")
+                        + self._get_collision_force("hand", "left_finger")
+                        + self._get_collision_force("hand", "cube")
+                        + self._get_collision_force("robot", "cube")
+                        + self._get_collision_force("hand", "table")
+                        + self._get_collision_force("robot", "table")
+                        + self._get_collision_force("left_finger", "table")
+                        + self._get_collision_force("right_finger", "table")
+                    )
                 )
             ]
         )
@@ -125,13 +129,13 @@ class Push(Panda):
         return np.linalg.norm(gripper_pos - cube_pos).item()
 
     def _get_gripper_cube_distance_reward(self, obs):
-        distance = self._get_gripper_cube_distance(obs)
-        distance_reward = -distance
+        gripper_cube_distance = self._get_gripper_cube_distance(obs)
+        distance_reward = -gripper_cube_distance
         return self._gripper_cube_distance_reward_weight * distance_reward
 
     def _get_cube_goal_distance_reward(self, obs):
-        distance = self._get_cube_goal_distance(obs)
-        distance_reward = -distance
+        cube_goal_distance = self._get_cube_goal_distance(obs)
+        distance_reward = -cube_goal_distance
         return self._cube_goal_distance_reward_weight * distance_reward
 
     def _get_ctrl_cost(self, action):
@@ -145,7 +149,7 @@ class Push(Panda):
         return self._contact_cost_weight * contact_cost
 
     def reward(self, obs, action, next_obs, absorbing):
-        if absorbing and not self._check_collision("cube", "floor"):
+        if absorbing:
             return 100
         gripper_cube_distance_reward = self._get_gripper_cube_distance_reward(next_obs)
         cube_goal_distance_reward = self._get_cube_goal_distance_reward(next_obs)
@@ -168,18 +172,17 @@ class Push(Panda):
 
     def setup(self, obs):
         super().setup(obs)
-        self._randomize_goal_position()
+        # self._randomize_goal_position()
         mujoco.mj_forward(self._model, self._data)  # type: ignore
 
-    def _create_info_dictionary(self, obs):
+    def _create_info_dictionary(self, obs, action):
         info = super()._create_info_dictionary(obs)
         self._get_contact_cost(obs)
-        info["success"] = int(self.is_absorbing(obs))
         info["gripper_cube_distance_reward"] = self._get_gripper_cube_distance_reward(
             obs
         )
         info["cube_goal_distance_reward"] = self._get_cube_goal_distance_reward(obs)
-        # info["ctrl_cost"] = self._get_ctrl_cost(action)
+        info["ctrl_cost"] = self._get_ctrl_cost(action)
         info["contact_cost"] = self._get_contact_cost(obs)
         info["gripper_cube_distance"] = self._get_gripper_cube_distance(obs)
         info["cube_goal_distance"] = self._get_cube_goal_distance(obs)

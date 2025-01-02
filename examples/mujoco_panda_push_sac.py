@@ -7,7 +7,7 @@ import torch.nn.functional as F
 
 from mushroom_rl.algorithms.actor_critic import SAC
 from mushroom_rl.core import Core, Logger
-from mushroom_rl.environments.mujoco_envs.push import Push
+from mushroom_rl.environments.mujoco_envs.franka_panda.push import Push
 
 from tqdm import trange
 
@@ -23,9 +23,15 @@ class CriticNetwork(nn.Module):
         self._h2 = nn.Linear(n_features, n_features)
         self._h3 = nn.Linear(n_features, n_output)
 
-        nn.init.xavier_uniform_(self._h1.weight, gain=nn.init.calculate_gain("relu"))
-        nn.init.xavier_uniform_(self._h2.weight, gain=nn.init.calculate_gain("relu"))
-        nn.init.xavier_uniform_(self._h3.weight, gain=nn.init.calculate_gain("linear"))
+        nn.init.xavier_uniform_(
+            self._h1.weight, gain=nn.init.calculate_gain("relu") / 10
+        )
+        nn.init.xavier_uniform_(
+            self._h2.weight, gain=nn.init.calculate_gain("relu") / 10
+        )
+        nn.init.xavier_uniform_(
+            self._h3.weight, gain=nn.init.calculate_gain("linear") / 10
+        )
 
     def forward(self, state, action):
         state_action = torch.cat((state.float(), action.float()), dim=1)
@@ -47,9 +53,15 @@ class ActorNetwork(nn.Module):
         self._h2 = nn.Linear(n_features, n_features)
         self._h3 = nn.Linear(n_features, n_output)
 
-        nn.init.xavier_uniform_(self._h1.weight, gain=nn.init.calculate_gain("relu"))
-        nn.init.xavier_uniform_(self._h2.weight, gain=nn.init.calculate_gain("relu"))
-        nn.init.xavier_uniform_(self._h3.weight, gain=nn.init.calculate_gain("linear"))
+        nn.init.xavier_uniform_(
+            self._h1.weight, gain=nn.init.calculate_gain("relu") / 10
+        )
+        nn.init.xavier_uniform_(
+            self._h2.weight, gain=nn.init.calculate_gain("relu") / 10
+        )
+        nn.init.xavier_uniform_(
+            self._h3.weight, gain=nn.init.calculate_gain("linear") / 10
+        )
 
     def forward(self, state):
         features1 = F.relu(self._h1(torch.squeeze(state, 1).float()))
@@ -131,6 +143,9 @@ def experiment(alg, n_epochs, n_steps, n_episodes_test):
     R = np.mean(dataset.undiscounted_return)
     E = agent.policy.entropy(dataset.state)
 
+    for key, value in dataset.info.items():
+        print(key, np.mean(value))
+
     logger.epoch_info(0, J=J, R=R, entropy=E)
 
     core.learn(
@@ -139,11 +154,14 @@ def experiment(alg, n_epochs, n_steps, n_episodes_test):
 
     for n in trange(n_epochs, leave=False):
         core.learn(n_steps=n_steps, n_steps_per_fit=1, quiet=True)
-        dataset = core.evaluate(n_episodes=n_episodes_test, render=False, quiet=True)
+        dataset = core.evaluate(n_episodes=n_episodes_test, render=True, quiet=True)
 
         J = np.mean(dataset.discounted_return)
         R = np.mean(dataset.undiscounted_return)
         E = agent.policy.entropy(dataset.state)
+
+        for key, value in dataset.info.items():
+            print(key, np.mean(value))
 
         logger.epoch_info(n + 1, J=J, R=R, entropy=E)
 

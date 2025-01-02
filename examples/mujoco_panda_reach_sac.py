@@ -7,7 +7,7 @@ import torch.nn.functional as F
 
 from mushroom_rl.algorithms.actor_critic import SAC
 from mushroom_rl.core import Core, Logger
-from mushroom_rl.environments.mujoco_envs.reach import Reach
+from mushroom_rl.environments.mujoco_envs.franka_panda.reach import Reach
 
 from tqdm import trange
 
@@ -139,7 +139,7 @@ def experiment(alg, n_epochs, n_steps, n_episodes_test):
 
     for n in trange(n_epochs, leave=False):
         core.learn(n_steps=n_steps, n_steps_per_fit=1, quiet=True)
-        dataset = core.evaluate(n_episodes=n_episodes_test, render=False, quiet=True)
+        dataset = core.evaluate(n_episodes=n_episodes_test, render=True, quiet=True)
 
         J = np.mean(dataset.discounted_return)
         R = np.mean(dataset.undiscounted_return)

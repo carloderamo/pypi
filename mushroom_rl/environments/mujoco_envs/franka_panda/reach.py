@@ -1,3 +1,4 @@
+import math
 from pathlib import Path
 import random
 
@@ -6,7 +7,7 @@ import mujoco
 
 from mushroom_rl.environments.mujoco import ObservationType
 from mushroom_rl.rl_utils.spaces import Box
-from mushroom_rl.environments.mujoco_envs.panda import Panda
+from mushroom_rl.environments.mujoco_envs.franka_panda.panda import Panda
 
 
 class Reach(Panda):
@@ -16,31 +17,28 @@ class Reach(Panda):
         gamma: float = 0.99,
         horizon: int = 200,
         gripper_goal_distance_reward_weight: float = 1.0,
-        ctrl_cost_weight: float = 1e-4,
-        normalize_reward: bool = False,
+        ctrl_cost_weight: float = 0.1,
         n_substeps: int = 10,
-        goal_noise_scale: float = 0.2,
+        goal_distance_threshold: float = 0.1,
         **viewer_params,
     ):
 
         xml_path = (
-            Path(__file__).resolve().parent / "data" / "panda" / "reach" / "reach.xml"
+            Path(__file__).resolve().parent.parent
+            / "data"
+            / "panda"
+            / "reach"
+            / "reach.xml"
         ).as_posix()
 
         additional_data_spec = [
             ("goal_pos", "goal", ObservationType.BODY_POS),
         ]
 
-        self._gripper_goal_distance = 0
-
         self._gripper_goal_distance_reward_weight = gripper_goal_distance_reward_weight
         self._ctrl_cost_weight = ctrl_cost_weight
 
-        self._gripper_goal_distance_reward = 0
-        self._ctrl_cost = 0
-
-        self._normalize_reward = normalize_reward
-        self._goal_noise_scale = goal_noise_scale
+        self._goal_distance_threshold = goal_distance_threshold
 
         if viewer_params:
             viewer_params["camera_params"]["static"]["elevation"] = -30
@@ -79,7 +77,8 @@ class Reach(Panda):
         return np.linalg.norm(goal_pos - gripper_pos)
 
     def _get_gripper_goal_distance_reward(self, obs):
-        distance_reward = self._get_gripper_goal_distance(obs)
+        gripper_goal_distance = self._get_gripper_goal_distance(obs)
+        distance_reward = -gripper_goal_distance
         return self._gripper_goal_distance_reward_weight * distance_reward
 
     def _get_ctrl_cost(self, action):
@@ -92,11 +91,11 @@ class Reach(Panda):
             return 100
         gripper_goal_distance_reward = self._get_gripper_goal_distance_reward(next_obs)
         ctrl_cost = self._get_ctrl_cost(action)
-        reward = -gripper_goal_distance_reward - ctrl_cost
+        reward = gripper_goal_distance_reward - ctrl_cost
         return reward
 
     def is_absorbing(self, obs):
-        return self._get_gripper_goal_distance(obs) < 0.1
+        return self._get_gripper_goal_distance(obs) < self._goal_distance_threshold
 
     def setup(self, obs):
         super().setup(obs)
@@ -109,12 +108,6 @@ class Reach(Panda):
         # info["ctrl_cost"] = self.ctrl_cost(action)
         return info
 
-    def _get_error(self, obs):
-        gripper_pos = self.obs_helper.get_from_obs(obs, "gripper_pos")
-        goal_pos = self.obs_helper.get_from_obs(obs, "goal_pos")
-        error = np.linalg.norm(gripper_pos - goal_pos).item()
-        return error
-
     def _randomize_goal_position(self):
         random_workspace_pos = self.sample_workspace()
         self._data.mocap_pos[0][:] = random_workspace_pos
@@ -124,21 +117,15 @@ class Reach(Panda):
         radius = 0.8  # mm
         workspace_height = 1  # mm
 
-        import math
+        # Generate random angle and radius
+        angle = random.uniform(-np.pi / 2, np.pi / 2)
+        r = random.uniform(0.3, radius)
 
-        while True:
-            # Generate random angle and radius
-            angle = random.uniform(-np.pi / 2, np.pi / 2)
-            r = random.uniform(0.3, radius)
+        # Convert polar coordinates to Cartesian
+        x = r * math.cos(angle)
+        y = r * math.sin(angle)
 
-            # Convert polar coordinates to Cartesian
+        # Generate random height within the workspace
+        z = random.uniform(0, workspace_height)
 
-            x = r * math.cos(angle)
-            y = r * math.sin(angle)
-
-            # Generate random height within the workspace
-            z = random.uniform(0, workspace_height)
-
-            # Check if the point is within the workspace (excluding the cutout)
-            if x >= -855 or y >= 0:
-                return x, y, z
+        return x, y, z

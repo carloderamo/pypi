@@ -10,7 +10,7 @@ from mushroom_rl.environments.mujoco import MuJoCo, ObservationType
 class Panda(MuJoCo):
 
     config_path = (
-        Path(__file__).resolve().parent / "data" / "panda" / "panda.yaml"
+        Path(__file__).resolve().parent.parent / "data" / "panda" / "panda.yaml"
     ).as_posix()
 
     with open(config_path, "r") as file:
