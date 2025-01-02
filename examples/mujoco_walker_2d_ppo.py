@@ -6,7 +6,7 @@ import torch.optim as optim
 
 from mushroom_rl.algorithms.actor_critic import PPO
 from mushroom_rl.core import Core, Logger
-from mushroom_rl.environments.mujoco_envs.walker_2d import Walker2D
+from mushroom_rl.environments import Walker2D
 from mushroom_rl.policy import GaussianTorchPolicy
 
 from tqdm import trange
