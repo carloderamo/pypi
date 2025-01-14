@@ -15,7 +15,7 @@ class Push(Panda):
         horizon: int = 200,
         gripper_cube_distance_reward_weight: float = 0.5,
         cube_goal_distance_reward_weight: float = 1.0,
-        ctrl_cost_weight: float = 0.01,
+        ctrl_cost_weight: float = 0.0,
         contact_cost_weight: float = 0,
         n_substeps: int = 10,
         goal_noise_scale: float = 0.2,
@@ -125,7 +125,8 @@ class Push(Panda):
 
     def _get_gripper_cube_distance(self, obs):
         gripper_pos = self.obs_helper.get_from_obs(obs, "gripper_pos")
-        cube_pos = self.obs_helper.get_from_obs(obs, "cube_pos")
+        cube_pos = self.obs_helper.get_from_obs(obs, "cube_pos").copy()
+        cube_pos[1] += 0.025
         return np.linalg.norm(gripper_pos - cube_pos).item()
 
     def _get_gripper_cube_distance_reward(self, obs):
@@ -136,6 +137,7 @@ class Push(Panda):
     def _get_cube_goal_distance_reward(self, obs):
         cube_goal_distance = self._get_cube_goal_distance(obs)
         distance_reward = -cube_goal_distance
+        distance_reward = max(distance_reward, -0.255)
         return self._cube_goal_distance_reward_weight * distance_reward
 
     def _get_ctrl_cost(self, action):
@@ -149,8 +151,6 @@ class Push(Panda):
         return self._contact_cost_weight * contact_cost
 
     def reward(self, obs, action, next_obs, absorbing):
-        if absorbing:
-            return 100
         gripper_cube_distance_reward = self._get_gripper_cube_distance_reward(next_obs)
         cube_goal_distance_reward = self._get_cube_goal_distance_reward(next_obs)
         ctrl_cost = self._get_ctrl_cost(action)
@@ -167,7 +167,9 @@ class Push(Panda):
         cube_vel = self.obs_helper.get_from_obs(obs, "cube_vel")
         cube_goal_distance = self._get_cube_goal_distance(obs)
         is_cube_at_goal = cube_goal_distance < 0.05
-        is_cube_moving = np.linalg.norm(cube_vel) < 0.02
+        if is_cube_at_goal:
+            print(np.sum(np.square(cube_vel)))
+        is_cube_moving = np.sum(np.square(cube_vel)) > 0.02
         return is_cube_at_goal and not is_cube_moving
 
     def setup(self, obs):
