@@ -12,6 +12,10 @@ class ArrayBackend(object):
         raise NotImplementedError
 
     @staticmethod
+    def get_backend_serialization():
+        raise NotImplementedError
+
+    @staticmethod
     def get_array_backend(backend_name):
         assert type(backend_name) == str, f"Backend has to be string, not {type(backend_name).__name__}."
         if backend_name == 'numpy':
@@ -175,6 +179,10 @@ class NumpyBackend(ArrayBackend):
         return 'numpy'
 
     @staticmethod
+    def get_backend_serialization():
+        return 'numpy'
+
+    @staticmethod
     def to_numpy(array):
         return array
 
@@ -301,6 +309,10 @@ class TorchBackend(ArrayBackend):
 
     @staticmethod
     def get_backend_name():
+        return 'torch'
+
+    @staticmethod
+    def get_backend_serialization():
         return 'torch'
 
     @staticmethod
@@ -437,6 +449,10 @@ class ListBackend(ArrayBackend):
     @staticmethod
     def get_backend_name():
         return 'list'
+
+    @staticmethod
+    def get_backend_serialization():
+        return 'numpy'
 
     @staticmethod
     def to_numpy(array):

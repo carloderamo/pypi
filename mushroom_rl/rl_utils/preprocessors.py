@@ -1,5 +1,3 @@
-import numpy as np
-
 from mushroom_rl.core import Serializable, ArrayBackend
 from mushroom_rl.rl_utils.running_stats import RunningStandardization
 
@@ -122,9 +120,9 @@ class MinMaxPreprocessor(StandardizationPreprocessor):
         self._add_save_attr(
             _array_backend='pickle',
             _run_norm_obs='primitive',
-            _obs_mask='numpy',
-            _obs_mean='numpy',
-            _obs_delta='numpy'
+            _obs_mask=self._array_backend.get_backend_serialization(),
+            _obs_mean=self._array_backend.get_backend_serialization(),
+            _obs_delta=self._array_backend.get_backend_serialization()
         )
 
     def __call__(self, obs):
