@@ -6,6 +6,7 @@ from mushroom_rl.approximators import Regressor
 from mushroom_rl.approximators.parametric import LinearApproximator, TorchApproximator
 from mushroom_rl.rl_utils.value_functions import compute_gae, compute_advantage_montecarlo
 
+from mushroom_rl.utils.episodes import split_episodes, unsplit_episodes
 
 def test_compute_advantage_montecarlo():
     def advantage_montecarlo(V, s, ss, r, absorbing, last, gamma):
@@ -24,11 +25,13 @@ def test_compute_advantage_montecarlo():
             adv = q - v
             return q[:, None], adv[:, None]
         
+    torch.manual_seed(42)
     test_value_functions(compute_advantage_montecarlo, advantage_montecarlo, 0.99)
-        
+    
 def test_compute_gae():
     def gae(V, s, ss, r, absorbing, last, gamma, lam):
         with torch.no_grad():
+            r = r.float()
             v = V(s)
             v_next = V(ss)
             gen_adv = torch.empty_like(v)
@@ -39,16 +42,20 @@ def test_compute_gae():
                     if not absorbing[k]:
                         gen_adv[k] += gamma * v_next[k]
                 else:
-                    gen_adv[k] = r[k] + gamma * v_next[k] - v[k] + gamma * lam * gen_adv[k + 1]
+                    diff = r[k] - v[k]
+                    v_next_discounted = gamma * v_next[k]
+                    last_adv = gamma * lam * gen_adv[k + 1]
+                    gen_adv[k] = diff + v_next_discounted + last_adv
             return gen_adv + v, gen_adv
-        
+
+    torch.manual_seed(42)
     test_value_functions(compute_gae, gae, 0.99, 0.95)
         
 def test_value_functions(test_fun, correct_fun, *args):
     mdp = Segway()
     V = Regressor(TorchApproximator, input_shape=mdp.info.observation_space.shape, output_shape=(1,), network=Net, loss=torch.nn.MSELoss(), optimizer={'class': torch.optim.Adam, 'params': {'lr': 0.001}})
 
-    state, action, reward, next_state, absorbing, last = get_episodes(mdp)
+    state, action, reward, next_state, absorbing, last = get_episodes(mdp, 10)
     
     correct_v, correct_adv = correct_fun(V, state, next_state, reward, absorbing, last, *args)
     v, adv = test_fun(V, state, next_state, reward, absorbing, last, *args)
@@ -87,6 +94,3 @@ class Net(torch.nn.Module):
 
     def forward(self, x):
         return self._q(x.float())
-
-# test_compute_gae()
-test_compute_advantage_montecarlo()

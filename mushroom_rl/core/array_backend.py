@@ -171,7 +171,14 @@ class ArrayBackend(object):
     @staticmethod
     def full(shape, value):
         raise NotImplementedError
-
+    
+    @staticmethod
+    def nonzero(array):
+        raise NotImplementedError
+    
+    @staticmethod
+    def repeat(array, repeats):
+        raise NotImplementedError
 
 class NumpyBackend(ArrayBackend):
     @staticmethod
@@ -303,6 +310,14 @@ class NumpyBackend(ArrayBackend):
     @staticmethod
     def full(shape, value):
         return np.full(shape, value)
+    
+    @staticmethod
+    def nonzero(array):
+        return np.flatnonzero(array)
+    
+    @staticmethod
+    def repeat(array, repeats):
+        return np.repeat(array, repeats)
 
 
 class TorchBackend(ArrayBackend):
@@ -443,6 +458,14 @@ class TorchBackend(ArrayBackend):
     @staticmethod
     def full(shape, value):
         return torch.full(shape, value)
+    
+    @staticmethod
+    def nonzero(array):
+        return torch.nonzero(array)
+    
+    @staticmethod
+    def repeat(array, repeats):
+        return torch.repeat_interleave(array, repeats)
 
 class ListBackend(ArrayBackend):
 

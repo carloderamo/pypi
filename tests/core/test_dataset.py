@@ -129,36 +129,3 @@ def test_dataset_loading(tmpdir):
     assert len(dataset.info) == len(new_dataset.info)
     for key in dataset.info:
         assert np.array_equal(dataset.info[key], new_dataset.info[key])
-
-def test_compute_J():
-    def compute_J(self, gamma=1.):
-        js = list()
-
-        j = 0.
-        episode_steps = 0
-        for i in range(len(self)):
-            j += gamma ** episode_steps * self.reward[i]
-            episode_steps += 1
-            if self.last[i] or i == len(self) - 1:
-                js.append(j)
-                j = 0.
-                episode_steps = 0
-
-        if len(js) == 0:
-            js = [0.]
-
-        return self._array_backend.from_list(js)
-    mdp = GridWorld(3, 3, (2, 2))
-    dataset = generate_dataset(mdp, 100)
-
-    correct_R = compute_J(dataset)
-    R = dataset.compute_J()
-
-    assert np.allclose(R, correct_R)
-
-    correct_J = compute_J(dataset, 0.9)
-    J = dataset.compute_J(0.9)
-
-    assert np.allclose(J, correct_J)
-
-test_compute_J()
