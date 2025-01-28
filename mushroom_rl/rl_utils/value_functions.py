@@ -101,17 +101,14 @@ def compute_gae(V, s, ss, r, absorbing, last, gamma, lam):
         v = V(s)
         v_next = V(ss)
 
-        v_ep, v_next_ep, r_ep, absorbing_ep = split_episodes(last, v.squeeze(), v_next.squeeze(), r.float(), absorbing)
+        v_ep, v_next_ep, r_ep, absorbing_ep = split_episodes(last, v.squeeze(), v_next.squeeze(), r, absorbing)
         gen_adv_ep = torch.zeros_like(v_ep)
-        diff = r_ep - v_ep
-        v_next_discounted = (1 - absorbing_ep.int()) * gamma * v_next_ep
         for rev_k in range(v_ep.shape[-1]):
             k = v_ep.shape[-1] - rev_k - 1
             if rev_k == 0:
-                gen_adv_ep[..., k] = diff[..., k] + v_next_discounted[..., k]
+                gen_adv_ep[..., k] = r_ep[..., k] - v_ep[..., k] + (1 - absorbing_ep[..., k].int()) * gamma * v_next_ep[..., k]
             else:
-                last_adv = gamma * lam * gen_adv_ep[..., k + 1]
-                gen_adv_ep[..., k] = diff[..., k] + v_next_discounted[..., k] + last_adv
+                gen_adv_ep[..., k] = r_ep[..., k] - v_ep[..., k] + (1 - absorbing_ep[..., k].int()) * gamma * v_next_ep[..., k] + gamma * lam * gen_adv_ep[..., k + 1]
 
         gen_adv = unsplit_episodes(last, gen_adv_ep).unsqueeze(-1)
 
