@@ -195,7 +195,12 @@ class NumpyBackend(ArrayBackend):
 
     @staticmethod
     def to_torch(array):
-        return None if array is None else torch.from_numpy(array).to(TorchUtils.get_device())
+        if array is None:
+            return None
+        else:
+            if array.dtype == np.float64:
+                array = array.astype(np.float32)
+            return torch.from_numpy(array).to(TorchUtils.get_device())
 
     @staticmethod
     def convert_to_backend(cls, array):
