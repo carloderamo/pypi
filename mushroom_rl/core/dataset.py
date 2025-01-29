@@ -11,6 +11,7 @@ from .extra_info import ExtraInfo
 
 from ._impl import *
 
+from mushroom_rl.utils.episodes import split_episodes, unsplit_episodes
 
 class DatasetInfo(Serializable):
     def __init__(self, backend, device, horizon, gamma, state_shape, state_dtype, action_shape, action_dtype,
@@ -473,22 +474,19 @@ class Dataset(Serializable):
             The cumulative discounted reward of each episode in the dataset.
 
         """
-        js = list()
+        r_ep = split_episodes(self.last, self.reward)
 
-        j = 0.
-        episode_steps = 0
-        for i in range(len(self)):
-            j += gamma ** episode_steps * self.reward[i]
-            episode_steps += 1
-            if self.last[i] or i == len(self) - 1:
-                js.append(j)
-                j = 0.
-                episode_steps = 0
+        if len(r_ep.shape) == 1:
+            r_ep = r_ep.unsqueeze(0)
+        if hasattr(r_ep, 'device'):
+            js = self._array_backend.zeros(r_ep.shape[0], dtype=r_ep.dtype, device=r_ep.device)
+        else:
+            js = self._array_backend.zeros(r_ep.shape[0], dtype=r_ep.dtype)
 
-        if len(js) == 0:
-            js = [0.]
+        for k in range(r_ep.shape[1]):
+            js += gamma ** k * r_ep[..., k]
 
-        return self._array_backend.from_list(js)
+        return js
 
     def compute_metrics(self, gamma=1.):
         """
