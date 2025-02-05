@@ -25,7 +25,7 @@ jobs:
         pip install -e .[all]
     - name: Install Atari ROMs
       run: |
-        pip install gymnasium[accept-rom-license]
+        pip install "autorom[accept-rom-license]"
     - name: Lint with flake8
       run: |
         # stop the build if there are Python syntax errors or undefined names
