@@ -42,12 +42,12 @@ class Network(nn.Module):
         return a
 
 
-def experiment(env, alg, n_epochs, n_steps, n_episodes_test):
+def experiment(env, n_epochs, n_steps, n_episodes_test):
     np.random.seed()
 
-    logger = Logger(alg.__name__, results_dir=None)
+    logger = Logger(PPO.__name__, results_dir=None)
     logger.strong_line()
-    logger.info("Experiment Algorithm: " + alg.__name__)
+    logger.info("Experiment Algorithm: " + PPO.__name__)
 
     mdp = env()
 
@@ -89,7 +89,7 @@ def experiment(env, alg, n_epochs, n_steps, n_episodes_test):
         **policy_params,
     )
 
-    agent = alg(mdp.info, policy, **alg_params)
+    agent = PPO(mdp.info, policy, **alg_params)
 
     core = Core(agent, mdp)
 
@@ -117,8 +117,6 @@ def experiment(env, alg, n_epochs, n_steps, n_episodes_test):
 
 
 if __name__ == "__main__":
-    envs = [Ant]
-    algs = [PPO]
+    envs = [Ant, HalfCheetah, Hopper, Walker2D]
     for env in envs:
-        for alg in algs:
-            experiment(env=env, alg=alg, n_epochs=50, n_steps=30000, n_episodes_test=10)
+        experiment(env=env, n_epochs=50, n_steps=30000, n_episodes_test=10)
