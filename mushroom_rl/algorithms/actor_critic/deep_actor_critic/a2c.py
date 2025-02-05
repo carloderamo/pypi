@@ -57,10 +57,10 @@ class A2C(DeepAC):
         )
 
     def fit(self, dataset):
-        state, action, reward, next_state, absorbing, _ = dataset.parse(to='torch')
+        state, action, reward, next_state, absorbing, last = dataset.parse(to='torch')
 
         v, adv = compute_advantage_montecarlo(self._V, state, next_state,
-                                              reward, absorbing,
+                                              reward, absorbing, last,
                                               self.mdp_info.gamma)
         self._V.fit(state, v, **self._critic_fit_params)
 
