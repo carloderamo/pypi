@@ -44,7 +44,7 @@ def test_ant():
             0.01518631,
         ]
     )
-    mdp.render()
+    # mdp.render()
 
     assert np.allclose(ns, ns_test)
 
@@ -77,7 +77,7 @@ def test_half_cheetah():
             -0.46546397,
         ]
     )
-    mdp.render()
+    # mdp.render()
 
     assert np.allclose(ns, ns_test)
 
@@ -103,7 +103,7 @@ def test_hopper():
             5.19363748e00,
         ]
     )
-    mdp.render()
+    # mdp.render()
 
     assert np.allclose(ns, ns_test)
 
@@ -136,6 +136,6 @@ def test_walker_2d():
             -5.00609819,
         ]
     )
-    mdp.render()
+    # mdp.render()
 
     assert np.allclose(ns, ns_test)
