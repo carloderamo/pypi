@@ -11,6 +11,8 @@ from mushroom_rl.utils.viewer import ImageViewer
 
 import cv2
 
+gym.register_envs(ale_py)
+
 class Atari(Environment):
     """
     The Atari environment as presented in:
@@ -73,15 +75,21 @@ class Atari(Environment):
         # Viewer
         self._viewer =  ImageViewer((self.original_state_width, self.original_state_height), dt, headless=self._headless)
 
+        self._seed = None
+        
         super().__init__(mdp_info)
 
-    def reset(self, state=None, seed=None):
-        _, info = self.env.reset(seed=seed)
-        
+    def seed(self, seed):
+        self._seed = seed
+
+    def reset(self, state=None):
+        _, info = self.env.reset(seed=self._seed)
+        self._seed = None
+
         self.n_steps = 0
 
         if state is None:
-            self.env.ale.getScreenGrayscale(self.screen_buffer[0])
+            self.env.unwrapped.ale.getScreenGrayscale(self.screen_buffer[0])
             self.screen_buffer[1].fill(0)
 
             self.state_ = np.zeros((self.n_stacked_frames, self.state_height, self.state_width), dtype=np.uint8)
@@ -102,7 +110,7 @@ class Atari(Environment):
 
             if idx_frame >= self.n_skipped_frames - 2:
                 t = idx_frame - (self.n_skipped_frames - 2)
-                self.env.ale.getScreenGrayscale(self.screen_buffer[t])
+                self.env.unwrapped.ale.getScreenGrayscale(self.screen_buffer[t])
 
             if absorbing:
                 break

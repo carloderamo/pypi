@@ -19,7 +19,8 @@ os.environ["SDL_VIDEODRIVER"] = "dummy"
 def test_atari():
     np.random.seed(1)
     mdp = Atari(name='ALE/Pong-v5')
-    mdp.reset(seed=1)
+    mdp.seed(1)
+    mdp.reset()
     for i in range(10):
         ns, r, ab, _ = mdp.step([np.random.randint(mdp.info.action_space.n)])
 
