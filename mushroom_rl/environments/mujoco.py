@@ -227,7 +227,7 @@ class MuJoCo(Environment):
         """
         return obs
 
-    def _create_info_dictionary(self, obs):
+    def _create_info_dictionary(self, obs, action):
         """
         This method can be overridden to create a custom info dictionary.
 

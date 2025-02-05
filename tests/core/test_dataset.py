@@ -129,5 +129,3 @@ def test_dataset_loading(tmpdir):
     assert len(dataset.info) == len(new_dataset.info)
     for key in dataset.info:
         assert np.array_equal(dataset.info[key], new_dataset.info[key])
-
-

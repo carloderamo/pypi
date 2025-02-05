@@ -1,7 +1,7 @@
 import torch
+from mushroom_rl.utils.episodes import split_episodes, unsplit_episodes
 
-
-def compute_advantage_montecarlo(V, s, ss, r, absorbing, gamma):
+def compute_advantage_montecarlo(V, s, ss, r, absorbing, last, gamma):
     """
     Function to estimate the advantage and new value function target
     over a dataset. The value function is estimated using rollouts
@@ -24,18 +24,21 @@ def compute_advantage_montecarlo(V, s, ss, r, absorbing, gamma):
     """
     with torch.no_grad():
         r = r.squeeze()
-        q = torch.zeros(len(r))
         v = V(s).squeeze()
 
-        q_next = V(ss[-1]).squeeze().item()
-        for rev_k in range(len(r)):
-            k = len(r) - rev_k - 1
-            q_next = r[k] + gamma * q_next * (1 - absorbing[k].int())
-            q[k] = q_next
+        r_ep, absorbing_ep, ss_ep = split_episodes(last, r, absorbing, ss)
+        q_ep = torch.zeros_like(r_ep, dtype=torch.float32)
+        q_next_ep = V(ss_ep[..., -1, :]).squeeze()
 
+        for rev_k in range(r_ep.shape[-1]):
+            k = r_ep.shape[-1] - rev_k - 1
+            q_next_ep = r_ep[..., k] + gamma * q_next_ep * (1 - absorbing_ep[..., k].int())
+            q_ep[..., k] = q_next_ep
+
+        q = unsplit_episodes(last, q_ep)
         adv = q - v
-        return q[:, None], adv[:, None]
 
+        return q[:, None], adv[:, None]
 
 def compute_advantage(V, s, ss, r, absorbing, gamma):
     """
@@ -97,13 +100,16 @@ def compute_gae(V, s, ss, r, absorbing, last, gamma, lam):
     with torch.no_grad():
         v = V(s)
         v_next = V(ss)
-        gen_adv = torch.empty_like(v)
-        for rev_k in range(len(v)):
-            k = len(v) - rev_k - 1
-            if last[k] or rev_k == 0:
-                gen_adv[k] = r[k] - v[k]
-                if not absorbing[k]:
-                    gen_adv[k] += gamma * v_next[k]
+
+        v_ep, v_next_ep, r_ep, absorbing_ep = split_episodes(last, v.squeeze(), v_next.squeeze(), r, absorbing)
+        gen_adv_ep = torch.zeros_like(v_ep)
+        for rev_k in range(v_ep.shape[-1]):
+            k = v_ep.shape[-1] - rev_k - 1
+            if rev_k == 0:
+                gen_adv_ep[..., k] = r_ep[..., k] - v_ep[..., k] + (1 - absorbing_ep[..., k].int()) * gamma * v_next_ep[..., k]
             else:
-                gen_adv[k] = r[k] + gamma * v_next[k] - v[k] + gamma * lam * gen_adv[k + 1]
+                gen_adv_ep[..., k] = r_ep[..., k] - v_ep[..., k] + (1 - absorbing_ep[..., k].int()) * gamma * v_next_ep[..., k] + gamma * lam * gen_adv_ep[..., k + 1]
+
+        gen_adv = unsplit_episodes(last, gen_adv_ep).unsqueeze(-1)
+
         return gen_adv + v, gen_adv
