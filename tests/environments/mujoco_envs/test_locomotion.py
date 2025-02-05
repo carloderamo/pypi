@@ -108,7 +108,7 @@ def test_hopper():
     assert np.allclose(ns, ns_test)
 
 
-def test_walker2d():
+def test_walker_2d():
     np.random.seed(1)
     mdp = Walker2D()
     mdp.reset()
@@ -139,9 +139,3 @@ def test_walker2d():
     mdp.render()
 
     assert np.allclose(ns, ns_test)
-
-
-test_ant()
-test_half_cheetah()
-test_hopper()
-test_walker2d()
