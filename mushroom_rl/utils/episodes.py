@@ -47,7 +47,7 @@ def _get_episode_idx(last, backend=None):
     n_episodes = last.sum()
     last_idx = backend.nonzero(last).squeeze()
     first_steps = backend.from_list([last_idx[0] + 1])
-    if backend.get_backend_name == 'torch':
+    if backend.get_backend_name() == 'torch':
         first_steps = first_steps.to(last.device)
     episode_steps = backend.concatenate([first_steps, last_idx[1:] - last_idx[:-1]])
     max_episode_steps = episode_steps.max()
