@@ -118,17 +118,17 @@ def experiment():
     arg_game = parser.add_argument_group('Game')
     arg_game.add_argument("--name",
                           type=str,
-                          default='BreakoutDeterministic-v4',
+                          default='ALE/Breakout-v5',
                           help='Gymnasium ID of the Atari game.')
-    arg_game.add_argument("--screen-width", type=int, default=84,
-                          help='Width of the game screen.')
-    arg_game.add_argument("--screen-height", type=int, default=84,
-                          help='Height of the game screen.')
+    # arg_game.add_argument("--screen-width", type=int, default=84,
+    #                       help='Width of the game screen.')
+    # arg_game.add_argument("--screen-height", type=int, default=84,
+    #                       help='Height of the game screen.')
 
     arg_mem = parser.add_argument_group('Replay Memory')
     arg_mem.add_argument("--initial-replay-size", type=int, default=50000,
                          help='Initial size of the replay memory.')
-    arg_mem.add_argument("--max-replay-size", type=int, default=500000,
+    arg_mem.add_argument("--max-replay-size", type=int, default=100000, #changed to 100k instead of 500k because of memory restrictions
                          help='Max size of the replay memory.')
     arg_mem.add_argument("--prioritized", action='store_true',
                          help='Whether to use prioritized memory or not.')
@@ -218,6 +218,9 @@ def experiment():
                            help='Path of the model to be loaded.')
     arg_utils.add_argument('--render', action='store_true',
                            help='Flag specifying whether to render the game.')
+    arg_utils.add_argument('--record', action='store_true',
+                           help='Flag specifying whether to record the game.'
+                                'The render flag should be set to True')
     arg_utils.add_argument('--quiet', action='store_true',
                            help='Flag specifying whether to hide the progress'
                                 'bar.')
@@ -276,9 +279,10 @@ def experiment():
         max_steps = args.max_steps
 
     # MDP
-    mdp = GymnasiumAtari(args.name, args.screen_width, args.screen_height,
-                ends_at_life=True, history_length=args.history_length,
-                max_no_op_actions=args.max_no_op_actions, headless=False)
+    mdp = Atari(args.name, headless=False) 
+                # args.screen_width, args.screen_height,
+                # ends_at_life=True, history_length=args.history_length,
+                # max_no_op_actions=args.max_no_op_actions, 
 
     if args.load_path:
         logger = Logger(DQN.__name__, results_dir=None)
@@ -408,7 +412,7 @@ def experiment():
         pi.set_epsilon(epsilon_test)
         mdp.set_episode_end(False)
         dataset = core.evaluate(n_steps=test_samples, render=args.render,
-                                quiet=args.quiet, record=True)
+                                quiet=args.quiet, record=args.record)
         scores.append(get_stats(dataset, logger))
 
         np.save(folder_name + '/scores.npy', scores)
