@@ -44,7 +44,7 @@ def test_numpy_split():
     assert np.allclose(last, un_last)
     
 def get_episodes(mdp, n_episodes=100):
-    mu = torch.tensor([6.31154476, 3.32346271, 0.49648221]).unsqueeze(0)
+    mu = np.array([6.31154476, 3.32346271, 0.49648221])
     
     approximator = Regressor(LinearApproximator,
                             input_shape=mdp.info.observation_space.shape,
