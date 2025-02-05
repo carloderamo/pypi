@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 from mushroom_rl.policy import DeterministicPolicy
 from mushroom_rl.environments.segway import Segway
 from mushroom_rl.core import Core, Agent
@@ -49,7 +50,8 @@ def test_compute_gae():
         
 def _value_functions_tester(test_fun, correct_fun, *args):
     mdp = Segway()
-    V = Regressor(TorchApproximator, input_shape=mdp.info.observation_space.shape, output_shape=(1,), network=Net, loss=torch.nn.MSELoss(), optimizer={'class': torch.optim.Adam, 'params': {'lr': 0.001}})
+    V = Regressor(TorchApproximator, input_shape=mdp.info.observation_space.shape, output_shape=(1,),
+                  network=Net, loss=torch.nn.MSELoss(), optimizer={'class': torch.optim.Adam, 'params': {'lr': 0.001}})
 
     state, action, reward, next_state, absorbing, last = _get_episodes(mdp, 10)
     
@@ -68,7 +70,7 @@ def _value_functions_tester(test_fun, correct_fun, *args):
     assert torch.allclose(adv, correct_adv)
 
 def _get_episodes(mdp, n_episodes=100):
-    mu = torch.tensor([6.31154476, 3.32346271, 0.49648221]).unsqueeze(0)
+    mu = np.array([6.31154476, 3.32346271, 0.49648221])
     
     approximator = Regressor(LinearApproximator,
                             input_shape=mdp.info.observation_space.shape,

@@ -103,7 +103,7 @@ class AirHockeySingle(AirHockeyBase):
         obs = super(AirHockeySingle, self)._create_observation(state)
         return np.append(obs, [self.has_hit, self.has_bounce])
 
-    def _create_info_dictionary(self, obs):
+    def _create_info_dictionary(self, obs, action):
         constraints = {}
         q_pos = self.obs_helper.get_joint_pos_from_obs(obs)
         q_vel = self.obs_helper.get_joint_vel_from_obs(obs)
@@ -134,4 +134,3 @@ class AirHockeySingle(AirHockeyBase):
         constraints["joint_vel_constraints"][3:] = self.obs_helper.get_joint_vel_limits()[0] - q_vel
 
         return constraints
-
