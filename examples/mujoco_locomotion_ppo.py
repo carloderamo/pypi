@@ -1,3 +1,4 @@
+from argparse import ArgumentParser
 import numpy as np
 import torch
 import torch.nn as nn
@@ -6,7 +7,7 @@ import torch.optim as optim
 
 from mushroom_rl.algorithms.actor_critic import PPO
 from mushroom_rl.core import Core, Logger
-from mushroom_rl.environments import Hopper
+from mushroom_rl.environments import Ant, HalfCheetah, Hopper, Walker2D
 from mushroom_rl.policy import GaussianTorchPolicy
 
 from tqdm import trange
@@ -41,16 +42,14 @@ class Network(nn.Module):
         return a
 
 
-def experiment(n_epochs, n_steps, n_episodes_test, seed=0):
+def experiment(env, alg, n_epochs, n_steps, n_episodes_test):
+    np.random.seed()
 
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-
-    logger = Logger(PPO.__name__, results_dir=None)
+    logger = Logger(alg.__name__, results_dir=None)
     logger.strong_line()
-    logger.info("Experiment Algorithm: " + PPO.__name__)
+    logger.info("Experiment Algorithm: " + alg.__name__)
 
-    mdp = Hopper()
+    mdp = env()
 
     actor_lr = 3e-4
     critic_lr = 3e-4
@@ -90,7 +89,7 @@ def experiment(n_epochs, n_steps, n_episodes_test, seed=0):
         **policy_params,
     )
 
-    agent = PPO(mdp.info, policy, **alg_params)
+    agent = alg(mdp.info, policy, **alg_params)
 
     core = Core(agent, mdp)
 
@@ -118,4 +117,8 @@ def experiment(n_epochs, n_steps, n_episodes_test, seed=0):
 
 
 if __name__ == "__main__":
-    experiment(n_epochs=50, n_steps=30000, n_episodes_test=10)
+    envs = [Ant]
+    algs = [PPO]
+    for env in envs:
+        for alg in algs:
+            experiment(env=env, alg=alg, n_epochs=50, n_steps=30000, n_episodes_test=10)
