@@ -47,15 +47,15 @@ def _get_episode_idx(last, backend=None):
     n_episodes = last.sum()
     last_idx = backend.nonzero(last).squeeze()
     first_steps = backend.from_list([last_idx[0] + 1])
-    if backend == 'torch':
+    if backend.get_backend_name == 'torch':
         first_steps = first_steps.to(last.device)
     episode_steps = backend.concatenate([first_steps, last_idx[1:] - last_idx[:-1]])
     max_episode_steps = episode_steps.max()
 
-    start_idx = backend.concatenate([backend.zeros(1, dtype=int, device=last.device if backend == 'torch' else None), last_idx[:-1] + 1])
+    start_idx = backend.concatenate([backend.zeros(1, dtype=int, device=last.device if backend.get_backend_name() == 'torch' else None), last_idx[:-1] + 1])
     range_n_episodes = backend.arange(0, n_episodes, dtype=int)
     range_len = backend.arange(0, last.shape[0], dtype=int)
-    if backend == 'torch':
+    if backend.get_backend_name() == 'torch':
         range_n_episodes = range_n_episodes.to(last.device)
         range_len = range_len.to(last.device)
     row_idx = backend.repeat(range_n_episodes, episode_steps)
