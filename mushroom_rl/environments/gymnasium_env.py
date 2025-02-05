@@ -26,7 +26,7 @@ class Gymnasium(Environment):
         Constructor.
 
         Args:
-             name (str): gym id of the environment;
+             name (str): gymnasium id of the environment;
              horizon (int): the horizon. If None, use the one from Gymnasium;
              gamma (float, 0.99): the discount factor;
              headless (bool, False): If True, the rendering is forced to be headless.

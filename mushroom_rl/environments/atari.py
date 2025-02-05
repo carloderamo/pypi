@@ -18,7 +18,14 @@ class Atari(Environment):
     2015.
 
     """
-    def __init__(self, name, 
+    def __init__(self, 
+                 name, 
+                 width = 84,
+                 height = 84,
+                 full_action_space = False,
+                 repeat_action_probability = 0.25,
+                 frameskip = 4,
+                 framestack = 4,
                  headless = False
                  ):
         """
@@ -35,28 +42,19 @@ class Atari(Environment):
         assert 'v5' in name, 'This wrapper supports only v5 ALE environments'
         self.env = gym.make(
                             name,
-                            full_action_space=False, 
+                            full_action_space=full_action_space, 
                             frameskip=1, 
-                            repeat_action_probability=0.25, 
+                            repeat_action_probability=repeat_action_probability, 
                             render_mode='rgb_array'
                             )
 
         # MDP parameters
         self.name = name
-        self.state_height, self.state_width = (84, 84)
-        self.n_stacked_frames = 4
-        self.n_skipped_frames = 4
+        self.state_height, self.state_width = (height, width)
+        self.n_stacked_frames = frameskip
+        self.n_skipped_frames = framestack
         self._headless = headless
-        # self._episode_ends_at_life = ends_at_life
-        # self._max_lives = self.env.unwrapped.ale.lives()
-        # self._lives = self._max_lives
-        # self._force_fire = None
-        # self._real_reset = True
-        # self._max_no_op_actions = max_no_op_actions
-        # self._history_length = history_length
-        # self._current_no_op = None
 
-        # assert self.env.unwrapped.get_action_meanings()[0] == 'NOOP'
         self.original_state_height, self.original_state_width, _ = self.env.observation_space._shape
         self.screen_buffer = [
             np.empty((self.original_state_height, self.original_state_width), dtype=np.uint8),
@@ -67,18 +65,18 @@ class Atari(Environment):
         action_space = Discrete(self.env.action_space.n)
         observation_space = Box(
             low=0., high=255., shape=(self.n_stacked_frames, self.state_height, self.state_width))
-        horizon = 1e4 # instead of np.inf
+        horizon = 27_000 # instead of np.inf
         gamma = .99
         dt = 1/60
         mdp_info = MDPInfo(observation_space, action_space, gamma, horizon, dt)
 
         # Viewer
-        self._viewer =  ImageViewer((self.state_height, self.state_width), dt, headless=self._headless)
+        self._viewer =  ImageViewer((self.original_state_width, self.original_state_height), dt, headless=self._headless)
 
         super().__init__(mdp_info)
 
-    def reset(self, state=None):
-        _, info = self.env.reset()
+    def reset(self, state=None, seed=None):
+        _, info = self.env.reset(seed=seed)
         
         self.n_steps = 0
 
@@ -140,14 +138,3 @@ class Atari(Environment):
     def stop(self):
         self.env.close()
         self._viewer.close()
-
-    # def set_episode_end(self, ends_at_life):
-    #     """
-    #     Setter.
-
-    #     Args:
-    #         ends_at_life (bool): whether the episode ends when a life is
-    #             lost or not.
-
-    #     """
-    #     self._episode_ends_at_life = ends_at_life

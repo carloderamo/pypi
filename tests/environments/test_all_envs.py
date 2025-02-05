@@ -18,22 +18,14 @@ os.environ["SDL_VIDEODRIVER"] = "dummy"
 
 def test_atari():
     np.random.seed(1)
-    mdp = Atari(name='PongDeterministic-v4')
-    mdp.reset()
+    mdp = Atari(name='ALE/Pong-v5')
+    mdp.reset(seed=1)
     for i in range(10):
         ns, r, ab, _ = mdp.step([np.random.randint(mdp.info.action_space.n)])
+
     ns_test = np.load('tests/environments/test_atari_1.npy')
 
     assert np.allclose(ns, ns_test)
-
-    mdp = Atari(name='PongNoFrameskip-v4')
-    mdp.reset()
-    for i in range(10):
-        ns, r, ab, _ = mdp.step([np.random.randint(mdp.info.action_space.n)])
-    ns_test = np.load('tests/environments/test_atari_2.npy')
-
-    assert np.allclose(ns, ns_test)
-
 
 def test_car_on_hill():
     np.random.seed(1)
