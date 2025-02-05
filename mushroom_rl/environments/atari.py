@@ -11,6 +11,8 @@ from mushroom_rl.utils.viewer import ImageViewer
 
 import cv2
 
+gym.register_envs(ale_py)
+
 class Atari(Environment):
     """
     The Atari environment as presented in:
