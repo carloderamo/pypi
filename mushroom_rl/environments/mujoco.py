@@ -153,7 +153,7 @@ class MuJoCo(Environment):
 
         absorbing = self.is_absorbing(cur_obs)
         reward = self.reward(self._obs, action, cur_obs, absorbing)
-        info = self._create_info_dictionary(cur_obs)
+        info = self._create_info_dictionary(cur_obs, action)
 
         self._obs = cur_obs
 
@@ -199,7 +199,7 @@ class MuJoCo(Environment):
         """
         return obs
 
-    def _create_info_dictionary(self, obs):
+    def _create_info_dictionary(self, obs, action):
         """
         This method can be overridden to create a custom info dictionary.
 

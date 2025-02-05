@@ -115,7 +115,7 @@ class AirHockeyDouble(AirHockeyBase):
         obs = super(AirHockeyDouble, self)._create_observation(state)
         return np.append(obs, [self.robot_1_hit, self.robot_2_hit, self.has_bounce])
 
-    def _create_info_dictionary(self, obs):
+    def _create_info_dictionary(self, obs, action):
         constraints = {"agent-1": {}, "agent-2":{}}
 
         for i, key in enumerate(constraints.keys()):
