@@ -13,7 +13,7 @@ def split_episodes(last, *arrays):
     episodes_arrays = []
 
     for array in arrays:
-        array_ep = backend.zeros(n_episodes, max_episode_steps, *array.shape[1:], dtype=array.dtype, device=array.device if hasattr(array, 'device') else None)
+        array_ep = backend.zeros(n_episodes, max_episode_steps, *array.shape[1:], dtype=array.dtype, device=array.device if backend.get_backend_name() == "torch" else None)
 
         array_ep[row_idx, colum_idx] = array
         episodes_arrays.append(array_ep)
